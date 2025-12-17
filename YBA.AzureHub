@@ -2277,7 +2277,7 @@ LevelFarmTab:Space()
 local levelFarmToggle = LevelFarmTab:Toggle({
     Flag = "LevelFarm",
     Title = "Enable Level Farm",
-    Locked = true,
+    Locked = nil,
     Default = false,
     Callback = function(value)
         if value then
