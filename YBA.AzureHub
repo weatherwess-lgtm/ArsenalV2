@@ -2290,7 +2290,7 @@ local levelFarmToggle = LevelFarmTab:Toggle({
     end
 })
 LevelFarmTab:Section({
-    Title = "Your executor is not supported this script contains a bypass",
+    Title = "This features is still locked im working on it once its done im gonna update it :>",
     TextSize = 18,
     TextTransparency = .35,
     FontWeight = Enum.FontWeight.Medium,
