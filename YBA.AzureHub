@@ -452,6 +452,7 @@ AboutSection:Section({
     FontWeight = Enum.FontWeight.Medium,
 })
 local FarmingTab = Window:Tab({ Title = "Farming", Icon = "skull" })
+local SBRTab = Window:Tab({ Title = "SBR", Icon = "sliders-horizontal" })
 local SellingTab = Window:Tab({ Title = "Selling", Icon = "dollar-sign" })
 local VisualTab = Window:Tab({ Title = "Visual", Icon = "eye" })
 local AdjustTab = Window:Tab({ Title = "Adjust", Icon = "sliders-horizontal" })
@@ -960,11 +961,11 @@ while true do
     foundItem = true
     local itemPart = v:FindFirstChildOfClass("MeshPart") or v:FindFirstChildOfClass("Part")
     local proxPrompt = v:FindFirstChild("ProximityPrompt")
-    if instantPickup then
+      if instantPickup then
         instantTravelTo(itemPart)
-        wait(0.2) -- small delay for position sync
+        wait(1) -- Wait 1 second after arriving before picking up
         checkAndSellMax()
-        fireproximityprompt(proxPrompt, 0, true) -- force
+        fireproximityprompt(proxPrompt, 0, true)
     else
         travelTo(itemPart)
         wait(0.2)
@@ -1005,9 +1006,9 @@ if v then
     roaming = false
     local itemPart = v:FindFirstChildOfClass("MeshPart") or v:FindFirstChildOfClass("Part")
     local proxPrompt = v:FindFirstChild("ProximityPrompt")
-    if instantPickup then
+     if instantPickup then
         instantTravelTo(itemPart)
-        wait(0.2)
+        wait(1) -- Wait 1 second after arriving before picking up
         checkAndSellMax()
         fireproximityprompt(proxPrompt, 0, true)
     else
@@ -1261,7 +1262,17 @@ local cameraConnection = nil
 local cancelGui = nil
 local function enableAFKCamera()
 if not (normalFarmOn or afkFarmOn) then
-        notify("YBA Script", "AFK Camera only works when farming is enabled.")
+        WindUI:Popup({
+                Title = "Warning",
+                Icon = "bird",
+                Content = "Afk camera only works when farming is enabled",
+                Buttons = {
+                    {
+                        Title = "Ok",
+                        Icon = "cat",
+                    }
+                }
+            })
         afkCameraToggle:Set(false)
 return
 end
@@ -2290,7 +2301,7 @@ local levelFarmToggle = LevelFarmTab:Toggle({
     end
 })
 LevelFarmTab:Section({
-    Title = "This features is still locked im working on it once its done im gonna update it :>",
+    Title = "This feature is still not working",
     TextSize = 18,
     TextTransparency = .35,
     FontWeight = Enum.FontWeight.Medium,
@@ -3183,6 +3194,286 @@ instantPickupToggle:Set(false)
 afkCameraToggle:Set(false)
 autoLoadToggle:Set(false)
 notify("YBA Script", "Script loaded successfully.")
+--// SBR FEATURE INTEGRATION (BULLETPROOF VERSION)
+local function LoadSBRFeatures()
+    --// Verify all dependencies exist
+    if not SBRTab then
+        warn("SBR: SBRTab not found!")
+        return
+    end
+    
+    --// Check if in Steel Ball Run
+    local isSBR = game.PlaceId == 4643697430
+    
+    if not isSBR then
+        -- Not in SBR, show warning
+        SBRTab:Section({ Title = "⚠️ NOT IN SBR GAME" })
+        SBRTab:Section({ Title = "Join Steel Ball Run to use these features" })
+        SBRTab:Button({
+            Title = "Teleport to SBR",
+            Callback = function()
+                game.TeleportService:Teleport(4643697430, game.Players.LocalPlayer)
+            end
+        })
+        return
+    end
+    
+    --// In SBR mode - load features
+    local success, err = pcall(function()
+        --// Xenon V3 Library (SBR-Optimized)
+        local Xenon = {Utils = {}}
+        Xenon.__index = Xenon
+        Xenon.Utils.__index = Xenon.Utils
+
+        function Xenon.Utils.MakeUtilController(Settings)
+            local Utils = {
+                Tasks = {}; Services = {}; States = {}; Ints = {}; 
+                Strings = {}; Tables = {}; Settings = Settings or {ConfigName = "XenonV3/SBRConfig.json"};
+            }
+            Utils.Services = setmetatable({}, {__index = function(self, service)
+                if rawget(self, service) then return rawget(self, service) end
+                local GotService = game:GetService(service)
+                self[service] = GotService
+                return self[service]
+            end})
+            return setmetatable(Utils, Xenon.Utils)
+        end
+
+        function Xenon.Utils:MakeFolder()
+            if isfolder("XenonV3") == false then makefolder("XenonV3") end
+        end
+
+        function Xenon.Utils:ReadData()
+            self:MakeFolder()
+            local Data; pcall(function()
+                Data = self.Services.HttpService:JSONDecode(readfile(self.Settings.ConfigName))
+            end);
+            Data = Data or {Int={}, State={}, String={}, Table={}}
+            return {
+                Data = Data;
+                LoadData = function()
+                    self:AddValues(self:ConvertConfig(Data))
+                end;
+            }
+        end
+
+        function Xenon.Utils:WriteData(Data)
+            self:MakeFolder()
+            local StringData = self.Services.HttpService:JSONEncode(Data)
+            pcall(function() writefile(self.Settings.ConfigName, StringData) end)
+        end
+
+        function Xenon.Utils:ConvertConfig(Config)
+            local RepTable = Config
+            for i,v in pairs(RepTable) do
+                for ValName, ValueTable in pairs(v) do
+                    if ValueTable["Value"] ~= nil then
+                        local Val = ValueTable.Value
+                        ValueTable["Value"] = nil
+                        ValueTable[1] = Val
+                    end
+                end
+            end
+            return RepTable
+        end
+
+        function Xenon.Utils:AddValues(Values)
+            for key, value in pairs(Values) do
+                if key:lower() == "int" then
+                    for i,v in pairs(Values[key]) do
+                        self.Ints[i] = (type(v) == "number" and {["Value"] = v, ["SaveValue"] = false} or type(v) == "table" and {["Value"] = v[1], ["SaveValue"] = v["SaveValue"]})
+                    end
+                end
+                if key:lower() == "state" then
+                    for i,v in pairs(Values[key]) do
+                        self.States[i] = (type(v) == "boolean" and {["Value"] = v, ["SaveValue"] = false} or type(v) == "table" and {["Value"] = v[1], ["SaveValue"] = v["SaveValue"]})
+                    end
+                end
+                if key:lower() == "string" then
+                    for i,v in pairs(Values[key]) do
+                        self.Strings[i] = (type(v) == "string" and {["Value"] = v, ["Value"] = false} or type(v) == "table" and {["Value"] = v[1], ["SaveValue"] = v["SaveValue"]})
+                    end
+                end
+                if key:lower() == "table" then
+                    for i,v in pairs(Values[key]) do
+                        self.Tables[i] = ((v["SaveValue"] and v["SaveValue"] == true) and {["Value"] = v[1], ["SaveValue"] = v["SaveValue"]} or {["Value"] = v, ["SaveValue"] = false})
+                    end
+                end
+            end
+        end
+
+        function Xenon.Utils:GetInt(Value) return self.Ints[Value] and self.Ints[Value].Value or 0 end
+        function Xenon.Utils:GetString(Value) return self.Strings[Value] and self.Strings[Value].Value or "" end
+        function Xenon.Utils:GetState(Value) return self.States[Value] and self.States[Value].Value or false end
+        function Xenon.Utils:GetTable(Value) return self.Tables[Value] and self.Tables[Value].Value or {} end
+        function Xenon.Utils:SetInt(Value, NewValue) if self.Ints[Value] then self.Ints[Value].Value = NewValue end end
+        function Xenon.Utils:SetState(Value, NewValue) if self.States[Value] then self.States[Value].Value = NewValue end end
+        function Xenon.Utils:SetTable(Value, NewValue) if self.Tables[Value] then self.Tables[Value].Value = NewValue end end
+        function Xenon.Utils:ChangeTable(Value, TableIndex, NewValue) if self.Tables[Value] then self.Tables[Value].Value[TableIndex] = NewValue end end
+        function Xenon.Utils:AddTask(TaskName, Task) if not self.Tasks[TaskName] then self.Tasks[TaskName] = Task end return Task end
+        function Xenon.Utils:IsTaskRunning(TaskName) return self.Tasks[TaskName] and self.Tasks[TaskName].Connected end
+        function Xenon.Utils:DisconnectTask(TaskName) if self:IsTaskRunning(TaskName) then self.Tasks[TaskName]:Disconnect(); self.Tasks[TaskName] = nil end end
+        function Xenon.Utils:GetService(Service) return self.Services[Service] end
+        function Xenon.Utils:GetPlayer() return self.Services.Players.LocalPlayer end
+        function Xenon.Utils:GetCharacter() return self:GetPlayer().Character or self:GetPlayer().CharacterAdded:Wait() end
+        function Xenon.Utils:GetHumanoid() local Character = self:GetCharacter(); return Character and Character:FindFirstChildWhichIsA("Humanoid") end
+        function Xenon.Utils:GetHRP() local Character = self:GetCharacter(); return Character and Character:FindFirstChild("HumanoidRootPart") end
+        function Xenon.Utils:IsSBR() return game.PlaceId == 4643697430 end
+        function Xenon.Utils:GetHorse() local Name = self:GetPlayer().Name; return workspace:FindFirstChild(Name .."'s Horse") end
+        function Xenon.Utils:Teleport(CF, Offset) local Character = self:GetCharacter(); local FinalCF = typeof(CF) == "Vector3" and CFrame.new(CF) or CF; if Character and Character.PrimaryPart then Character.PrimaryPart.CFrame = FinalCF + (Offset or Vector3.new(0, 0, 0)) end end
+
+        --// Initialize SBR Utility
+        local SBR_Util = Xenon.Utils.MakeUtilController()
+        SBR_Util:ReadData():LoadData()
+
+        --// Initialize SBR values
+        SBR_Util:AddValues{
+            ["Int"] = {
+                ["SBR_Delay_1"] = 5; ["SBR_Delay_2"] = 5; ["SBR_Delay_3"] = 5;
+                ["SBR_Delay_4"] = 5; ["SBR_Delay_5"] = 5; ["SBR_Delay_Hide"] = 5;
+                ["HorseWalkSpeed"] = 16; ["HorseJumpPower"] = 50;
+            };
+            ["State"] = {
+                ["Use_Horse_ASBR"] = false; ["RedBarrierNoClip"] = false; ["PlayerESP"] = false;
+            };
+            ["String"] = {}; ["Table"] = {};
+        }
+
+        --// SBRTeleports table
+        local SBRTeleports = {}
+        pcall(function()
+            SBRTeleports = {
+                ["Stage 1 Barrier"] = workspace:FindFirstChild("Barriers"):FindFirstChild("1").CFrame,
+                ["Stage 2 Barrier"] = workspace:FindFirstChild("Barriers"):FindFirstChild("2").CFrame,
+                ["Stage 3 Barrier"] = workspace:FindFirstChild("Barriers"):FindFirstChild("3").CFrame,
+                ["Stage 4 Barrier"] = workspace:FindFirstChild("Map"):FindFirstChild("NYC Bridge"):FindFirstChild("Start").CFrame,
+                ["Normal Hide"] = workspace:FindFirstChild("Map"):FindFirstChild("NYC Bridge"):FindFirstChild("NYC Bridge"):FindFirstChild("Bridge"):FindFirstChild("MeshPart").CFrame,
+                ["Finish Hide"] = workspace:FindFirstChild("Map"):FindFirstChild("NYC Bridge"):FindFirstChild("Start").CFrame - Vector3.new(0,30,0),
+                ["Finish Line Barrier"] = workspace:FindFirstChild("Map"):FindFirstChild("NYC Bridge"):FindFirstChild("End_Line").CFrame + Vector3.new(0,100,0)
+            };
+        end)
+
+        --// SBR UI Sections
+        local SBRSettingsSection = SBRTab:Section({ Title = "SBR Settings" })
+        local AutoSBRSection = SBRTab:Section({ Title = "Auto SBR" })
+        local HorseControlsSection = SBRTab:Section({ Title = "Horse Controls" })
+        local PlayerTeleportSection = SBRTab:Section({ Title = "Player Teleports" })
+        local HorseTeleportSection = SBRTab:Section({ Title = "Horse Teleports" })
+
+        --// Player ESP
+        SBRSettingsSection:Toggle({
+            Flag = "SBR_PlayerESP",
+            Title = "Player ESP",
+            Default = false,
+            Callback = function(value)
+                SBR_Util:SetState("PlayerESP", value)
+                if value then
+                    local Folder = Instance.new("Folder", game.CoreGui); Folder.Name = "SBR_PlayerESP"
+                    local function setupPlayer(plr)
+                        if plr == SBR_Util:GetPlayer() then return end
+                        local function onChar(Chars)
+                            local Highlight = Instance.new("Highlight", Folder); Highlight.OutlineColor = Color3.fromRGB(255, 255, 255); Highlight.Adornee = Chars; Highlight.FillColor = Color3.fromRGB(255, 255, 255); Highlight.FillTransparency = 1
+                            local BGui = Instance.new("BillboardGui", Folder); BGui.Adornee = Chars:WaitForChild("Head"); BGui.StudsOffset = Vector3.new(0, 3, 0); BGui.AlwaysOnTop = true; BGui.Size = UDim2.new(4, 0, 0.5, 0)
+                            local TextLabel = Instance.new("TextLabel", BGui); TextLabel.Size = UDim2.new(1, 0, 1, 0); TextLabel.BackgroundTransparency = 1; TextLabel.Text = Chars.Name; TextLabel.Font = Enum.Font.Ubuntu; TextLabel.TextColor3 = Color3.fromRGB(255, 255, 255); TextLabel.TextScaled = false
+                        end
+                        SBR_Util:AddTask("SBR_Chr_"..plr.Name, plr.CharacterAdded:Connect(onChar))
+                        if plr.Character then onChar(plr.Character) end
+                    end
+                    for _, plr in pairs(game.Players:GetPlayers()) do setupPlayer(plr) end
+                    SBR_Util:AddTask("SBR_Chr2", game.Players.PlayerAdded:Connect(setupPlayer))
+                else
+                    if game.CoreGui:FindFirstChild("SBR_PlayerESP") then game.CoreGui.SBR_PlayerESP:Destroy() end
+                    SBR_Util:DisconnectTask("SBR_Chr2")
+                    for _, plr in pairs(game.Players:GetPlayers()) do SBR_Util:DisconnectTask("SBR_Chr_"..plr.Name) end
+                end
+            end
+        })
+
+        SBRSettingsSection:Toggle({ Flag = "SBR_UseHorse", Title = "Use Horse for Auto SBR", Default = false, Callback = function(value) SBR_Util:SetState("Use_Horse_ASBR", value) end })
+        SBRSettingsSection:Slider({ Flag = "SBR_Delay1", Title = "TP to 1st Barrier Delay", Step = 1, Value = {Min = 1, Max = 60, Default = 5}, Callback = function(value) SBR_Util:SetInt("SBR_Delay_1", value) end })
+        SBRSettingsSection:Slider({ Flag = "SBR_Delay2", Title = "TP to 2nd Barrier Delay", Step = 1, Value = {Min = 1, Max = 60, Default = 5}, Callback = function(value) SBR_Util:SetInt("SBR_Delay_2", value) end })
+        SBRSettingsSection:Slider({ Flag = "SBR_Delay3", Title = "TP to 3rd Barrier Delay", Step = 1, Value = {Min = 1, Max = 60, Default = 5}, Callback = function(value) SBR_Util:SetInt("SBR_Delay_3", value) end })
+        SBRSettingsSection:Slider({ Flag = "SBR_Delay4", Title = "TP to Last Barrier Delay", Step = 1, Value = {Min = 1, Max = 60, Default = 5}, Callback = function(value) SBR_Util:SetInt("SBR_Delay_4", value) end })
+        SBRSettingsSection:Slider({ Flag = "SBR_Delay5", Title = "TP to End Delay", Step = 1, Value = {Min = 1, Max = 20, Default = 5}, Callback = function(value) SBR_Util:SetInt("SBR_Delay_5", value) end })
+        SBRSettingsSection:Slider({ Flag = "SBR_HideDelay", Title = "Hide Delay", Step = 1, Value = {Min = 1, Max = 10, Default = 5}, Callback = function(value) SBR_Util:SetInt("SBR_Delay_Hide", value) end })
+
+        --// Auto SBR
+        AutoSBRSection:Toggle({
+            Flag = "SBR_AutoRace",
+            Title = "Auto SBR",
+            Default = false,
+            Callback = function(value)
+                if value then
+                    local HRP = SBR_Util:GetState("Use_Horse_ASBR") and SBR_Util:GetHorse().HumanoidRootPart or SBR_Util:GetHRP()
+                    if not HRP then notify("SBR", "Character not loaded!"); return end
+                    HRP.CFrame = SBRTeleports["Normal Hide"]
+                    repeat task.wait() until workspace.Barrier:FindFirstChild("StartBarrier") == nil
+                    task.wait(SBR_Util:GetInt("SBR_Delay_1")); HRP.CFrame = SBRTeleports["Stage 1 Barrier"]
+                    task.wait(SBR_Util:GetInt("SBR_Delay_Hide")); HRP.CFrame = SBRTeleports["Normal Hide"]
+                    repeat task.wait() until workspace.Barriers:FindFirstChild("1") == nil
+                    task.wait(SBR_Util:GetInt("SBR_Delay_2")); HRP.CFrame = SBRTeleports["Stage 2 Barrier"]
+                    task.wait(SBR_Util:GetInt("SBR_Delay_Hide")); HRP.CFrame = SBRTeleports["Normal Hide"]
+                    repeat task.wait() until workspace.Barriers:FindFirstChild("2") == nil
+                    task.wait(SBR_Util:GetInt("SBR_Delay_3")); HRP.CFrame = SBRTeleports["Stage 3 Barrier"]
+                    task.wait(SBR_Util:GetInt("SBR_Delay_Hide")); HRP.CFrame = SBRTeleports["Normal Hide"]
+                    repeat task.wait() until workspace.Barriers:FindFirstChild("3") == nil
+                    task.wait(SBR_Util:GetInt("SBR_Delay_4")); HRP.CFrame = SBRTeleports["Stage 4 Barrier"]
+                    task.wait(SBR_Util:GetInt("SBR_Delay_Hide"))
+                    repeat task.wait(); HRP.CFrame = SBRTeleports["Finish Hide"] until workspace.Barriers:FindFirstChild("4") == nil
+                    task.wait(SBR_Util:GetInt("SBR_Delay_5")); HRP.CFrame = SBRTeleports["Stage 4 Barrier"]
+                    task.wait(SBR_Util:GetInt("SBR_Delay_Hide")); HRP.CFrame = SBRTeleports["Finish Hide"]
+                end
+            end
+        })
+
+        AutoSBRSection:Toggle({
+            Flag = "SBR_NoClip",
+            Title = "Red Barrier No-Clip",
+            Default = false,
+            Callback = function(value)
+                SBR_Util:SetState("RedBarrierNoClip", value)
+                pcall(function()
+                    for _, v in pairs(workspace.Barrier:GetChildren()) do v.CanCollide = not value end
+                    for _, v in pairs(workspace.Barriers:GetChildren()) do v.CanCollide = not value end
+                end)
+            end
+        })
+
+        --// Horse Controls
+        HorseControlsSection:Slider({ Flag = "SBR_HorseSpeed", Title = "Horse WalkSpeed", Step = 1, Value = {Min = 0, Max = 120, Default = 16}, Callback = function(value) SBR_Util:SetInt("HorseWalkSpeed", value); local horse = SBR_Util:GetHorse(); if horse then horse.Humanoid.WalkSpeed = value end end })
+        HorseControlsSection:Slider({ Flag = "SBR_HorseJump", Title = "Horse JumpPower", Step = 1, Value = {Min = 0, Max = 100, Default = 50}, Callback = function(value) SBR_Util:SetInt("HorseJumpPower", value); local horse = SBR_Util:GetHorse(); if horse then horse.Humanoid.JumpPower = value; pcall(function() SBR_Util:DisconnectTask("HJP") end); SBR_Util:AddTask("HJP", game.UserInputService.InputBegan:Connect(function(inputObject, gameProcessedEvent) if not gameProcessedEvent and inputObject.KeyCode == Enum.KeyCode.Space then local horse = SBR_Util:GetHorse(); if horse then horse.Humanoid.Jump = true end end end)) end end })
+        HorseControlsSection:Button({ Flag = "SBR_TeleportHorse", Title = "Teleport Horse to Me", Callback = function() local horse = SBR_Util:GetHorse(); if horse then horse.PrimaryPart.CFrame = SBR_Util:GetHRP().CFrame else notify("SBR", "Horse not found!") end end })
+
+        --// Player Teleports
+        if SBRTeleports and next(SBRTeleports) then
+            for place, cframe in pairs(SBRTeleports) do
+                PlayerTeleportSection:Button({ Flag = "SBR_PTP_"..place, Title = place, Callback = function() local HRP = SBR_Util:GetHRP(); if HRP then HRP.CFrame = cframe else notify("SBR", "Character not loaded!") end end })
+            end
+        else
+            PlayerTeleportSection:Section({ Title = "Teleports not loaded - try refreshing" })
+        end
+
+        PlayerTeleportSection:Button({ Flag = "SBR_PTP_Horse", Title = "Teleport to Horse", Callback = function() local horse = SBR_Util:GetHorse(); if horse and horse:FindFirstChild("HumanoidRootPart") then SBR_Util:GetHRP().CFrame = horse.HumanoidRootPart.CFrame else notify("SBR", "Horse not found!") end end })
+
+        --// Horse Teleports
+        if SBRTeleports and next(SBRTeleports) then
+            for place, cframe in pairs(SBRTeleports) do
+                HorseTeleportSection:Button({ Flag = "SBR_HTP_"..place, Title = place, Callback = function() local horse = SBR_Util:GetHorse(); if horse then horse.PrimaryPart.CFrame = cframe else notify("SBR", "Horse not found!") end end })
+            end
+        else
+            HorseTeleportSection:Section({ Title = "Teleports not loaded - try refreshing" })
+        end
+    end)
+    
+    if not success then
+        warn("SBR Load Error: " .. tostring(err))
+        SBRTab:Section({ Title = "⚠️ Error loading SBR features" })
+        SBRTab:Section({ Title = "Error: " .. tostring(err) })
+    end
+end
+
+--// Execute SBR loader
+LoadSBRFeatures()
 local TeleportService = game:GetService("TeleportService")
 spawn(function()
 while true do
